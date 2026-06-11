@@ -1,26 +1,97 @@
-import User from "../models/User.js";
+const User  = require('../models/User');
+const TV    = require('../models/TransporterVerification');
+const Order = require('../models/Order');
 
-// Get all transporters
-export const getTransporters = async (req, res) => {
+const getTransporters = async (req, res) => {
   try {
-    const transporters = await User.find({ role: "transporter" });
-    res.json(transporters);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    const transporters = await User.find({ role: 'transporter' }).select('-password');
+    res.json({ success: true, transporters });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 };
 
-// Verify transporter
-export const verifyTransporter = async (req, res) => {
-  const { transporterId } = req.body;
+const getVerifications = async (req, res) => {
   try {
-    const transporter = await User.findById(transporterId);
-    if (!transporter) return res.status(404).json({ message: "Transporter not found" });
-
-    transporter.verified = true;
-    await transporter.save();
-    res.json({ message: "Transporter verified", transporter });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+    const verifications = await TV.find()
+      .populate('transporter', 'name email verified availability')
+      .populate('verifiedBy', 'name email')
+      .sort({ createdAt: -1 });
+    res.json({ success: true, verifications });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 };
+
+const makeDecision = async (req, res) => {
+  try {
+    const { decision, remarks } = req.body;
+    const { id } = req.params;
+
+    if (!['Verified','Rejected'].includes(decision))
+      return res.status(400).json({ success: false, message: 'decision must be Verified or Rejected' });
+
+    const transporter = await User.findOne({ _id: id, role: 'transporter' });
+    if (!transporter)
+      return res.status(404).json({ success: false, message: 'Transporter not found' });
+
+    const tv = await TV.findOne({ transporter: id });
+    if (!tv)
+      return res.status(404).json({ success: false, message: 'Verification record not found' });
+
+    tv.status     = decision;
+    tv.verifiedBy = req.user._id;
+    tv.remarks    = remarks || '';
+    await tv.save();
+
+    const isVerified = decision === 'Verified';
+    await User.findByIdAndUpdate(id, {
+      verified:        isVerified,
+      rejectionReason: isVerified ? null : (remarks || 'Not specified'),
+    });
+
+    // Real-time notification to the transporter
+    req.io.to(`user:${id}`).emit('verification_result', {
+      decision,
+      remarks: remarks || '',
+      message: isVerified
+        ? 'Congratulations! Your account has been verified. You can now go online.'
+        : `Your account was rejected. Reason: ${remarks || 'Not specified'}`,
+    });
+
+    res.json({ success: true, message: `Transporter ${decision}` });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+const getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate('buyer',       'name email')
+      .populate('transporter', 'name email availability')
+      .populate({ path: 'items.listing', populate: { path: 'seller', select: 'name' } })
+      .sort({ createdAt: -1 });
+    res.json({ success: true, orders });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+const getStats = async (req, res) => {
+  try {
+    const [buyers, sellers, transporters, verified, orders, pending] = await Promise.all([
+      User.countDocuments({ role: 'buyer' }),
+      User.countDocuments({ role: 'seller' }),
+      User.countDocuments({ role: 'transporter' }),
+      User.countDocuments({ role: 'transporter', verified: true }),
+      Order.countDocuments(),
+      TV.countDocuments({ status: 'Pending' }),
+    ]);
+    res.json({ success: true, stats: { buyers, sellers, transporters, verified, orders, pending } });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+module.exports = { getTransporters, getVerifications, makeDecision, getAllOrders, getStats };

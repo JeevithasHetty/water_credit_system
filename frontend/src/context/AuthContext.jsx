@@ -1,26 +1,53 @@
-import { createContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 
-export const AuthContext = createContext();
+const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem("user"))
-  );
+  const [user,    setUser]    = useState(null);
+  const [token,   setToken]   = useState(() => localStorage.getItem('aq_token'));
+  const [loading, setLoading] = useState(true);
 
-  const login = (data) => {
-    setUser(data.user);
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data.user));
+  useEffect(() => {
+    if (token) axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    else delete axios.defaults.headers.common['Authorization'];
+  }, [token]);
+
+  useEffect(() => {
+    const restore = async () => {
+      if (!token) { setLoading(false); return; }
+      try {
+        const { data } = await axios.get('/api/auth/me');
+        if (data.success) setUser(data.user);
+        else logout();
+      } catch {
+        logout();
+      } finally {
+        setLoading(false);
+      }
+    };
+    restore();
+  }, []);
+
+  const login = (userData, jwt) => {
+    localStorage.setItem('aq_token', jwt);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${jwt}`;
+    setToken(jwt);
+    setUser(userData);
   };
 
   const logout = () => {
+    localStorage.removeItem('aq_token');
+    delete axios.defaults.headers.common['Authorization'];
+    setToken(null);
     setUser(null);
-    localStorage.clear();
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, setUser }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+export const useAuth = () => useContext(AuthContext);
