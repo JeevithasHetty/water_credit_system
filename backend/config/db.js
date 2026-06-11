@@ -1,13 +1,9 @@
-const mongoose = require("mongoose");
+const mongoose = require('mongoose');
 
 const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log("✅ MongoDB connected");
-  } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
-    process.exit(1);
-  }
+  const uri = process.env.MONGO_URI || 'mongodb://localhost:27017/aquaflow_v2';
+  const conn = await mongoose.connect(uri);
+  console.log(`MongoDB connected: ${conn.connection.host}`);
 };
 
 module.exports = connectDB;
