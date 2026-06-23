@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ordersAPI } from '../api';
+import { ordersAPI, ratingsAPI } from '../api';
 import { Link }      from 'react-router-dom';
 import socket        from '../socket';
 
@@ -61,6 +61,39 @@ export default function BuyerOrdersPage() {
 }
 
 function OrderCard({ order }) {
+  const [showRating, setShowRating] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [review, setReview] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleSubmitRating = async () => {
+    if (rating < 1) {
+      setErr('Please select a rating');
+      return;
+    }
+    
+    setBusy(true);
+    try {
+      const seller = order.items[0]?.listing?.seller;
+      await ratingsAPI.submit({
+        orderId: order._id,
+        sellerId: seller?._id,
+        rating,
+        review,
+      });
+      setSubmitted(true);
+      setShowRating(false);
+      setRating(0);
+      setReview('');
+    } catch (e) {
+      setErr(e.response?.data?.message || 'Rating failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const idx = steps.indexOf(order.deliveryStatus);
   return (
     <div className="card fade-in">
@@ -129,6 +162,85 @@ function OrderCard({ order }) {
           : <div style={{ color:'var(--yellow)' }}>⏳ Awaiting transporter</div>
         }
       </div>
+
+      {/* Rating section for delivered orders */}
+      {order.deliveryStatus === 'Delivered' && (
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+          {submitted ? (
+            <div style={{ padding: '12px 14px', borderRadius: 6, background: 'rgba(34,197,94,.1)', border: '1px solid var(--green)', textAlign: 'center' }}>
+              <div style={{ fontSize: 13, color: 'var(--green)', fontWeight: 500 }}>✅ Thanks for rating!</div>
+            </div>
+          ) : !showRating ? (
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowRating(true)} style={{ width: '100%', justifyContent: 'center' }}>
+              ⭐ Rate this order
+            </button>
+          ) : (
+            <div>
+              {err && <div className="alert alert-error" style={{ marginBottom: 12, fontSize: 12 }}>{err}</div>}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 12, color: 'var(--dim)', display: 'block', marginBottom: 8 }}>Rating *</label>
+                <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
+                  {[1,2,3,4,5].map(r => (
+                    <button
+                      key={r}
+                      onClick={() => { setRating(r); setErr(''); }}
+                      style={{
+                        fontSize: 28,
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        opacity: r <= rating ? 1 : 0.3,
+                        transition: 'all .2s',
+                      }}
+                      onMouseEnter={(e) => e.target.style.transform = 'scale(1.2)'}
+                      onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                    >
+                      ⭐
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontSize: 12, color: 'var(--dim)', display: 'block', marginBottom: 6 }}>Review (optional)</label>
+                <textarea
+                  className="form-control"
+                  placeholder="Share your experience..."
+                  value={review}
+                  onChange={(e) => setReview(e.target.value)}
+                  rows={2}
+                  style={{ fontSize: 12 }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn btn-cyan btn-sm"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={handleSubmitRating}
+                  disabled={busy || rating < 1}
+                >
+                  {busy ? 'Submitting...' : 'Submit Rating'}
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                  onClick={() => { setShowRating(false); setRating(0); setReview(''); }}
+                  disabled={busy}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Order notes */}
+      {order.notes && (
+        <div style={{ marginTop: 14, padding: '10px 12px', borderRadius: 6, background: 'rgba(255,193,7,.05)', border: '1px solid var(--border)', fontSize: 12 }}>
+          <div style={{ color: 'var(--dim)', marginBottom: 4 }}>📝 Your note:</div>
+          <div>{order.notes}</div>
+        </div>
+      )}
     </div>
   );
 }

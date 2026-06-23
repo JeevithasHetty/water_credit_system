@@ -4,16 +4,28 @@ import socket from '../socket';
 const SocketContext = createContext(null);
 
 export const SocketProvider = ({ children, user, token }) => {
-  const [connected,     setConnected] = useState(false);
-  const [notifications, setNotifs]   = useState([]);
+  const [connected,       setConnected] = useState(false);
+  const [notifications,   setNotifs]   = useState([]);
+  const [allNotifications, setAllNotifs] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const addNotif = useCallback((msg, type = 'info') => {
     const id = Date.now();
-    setNotifs(prev => [{ id, msg, type }, ...prev].slice(0, 20));
+    const notif = { id, msg, type, timestamp: new Date() };
+    setNotifs(prev => [notif, ...prev].slice(0, 20));
+    setAllNotifs(prev => [notif, ...prev]);
+    setUnreadCount(prev => prev + 1);
     setTimeout(() => setNotifs(prev => prev.filter(n => n.id !== id)), 6000);
   }, []);
 
   const dismissNotif = (id) => setNotifs(prev => prev.filter(n => n.id !== id));
+
+  const markAllRead = () => setUnreadCount(0);
+
+  const clearAll = () => {
+    setAllNotifs([]);
+    setUnreadCount(0);
+  };
 
   useEffect(() => {
     if (!user || !token) {
@@ -78,6 +90,15 @@ export const SocketProvider = ({ children, user, token }) => {
       window.dispatchEvent(new CustomEvent('ws:new_listing', { detail: { listing } }));
     });
 
+    socket.on('low_stock', ({ title, remaining }) => {
+      addNotif(`⚠️ Low stock alert: ${title} has only ${remaining}L left`, 'warning');
+    });
+
+    socket.on('badge_assigned', ({ badge, message }) => {
+      addNotif(message, badge ? 'success' : 'info');
+      window.dispatchEvent(new CustomEvent('ws:badge_assigned', { detail: { badge } }));
+    });
+
     return () => {
       socket.off('connect');
       socket.off('disconnect');
@@ -91,12 +112,14 @@ export const SocketProvider = ({ children, user, token }) => {
       socket.off('admin_order_updated');
       socket.off('transporter_availability_changed');
       socket.off('new_listing');
+      socket.off('low_stock');
+      socket.off('badge_assigned');
       socket.disconnect();
     };
   }, [user, token, addNotif]);
 
   return (
-    <SocketContext.Provider value={{ connected, notifications, dismissNotif, socket }}>
+    <SocketContext.Provider value={{ connected, notifications, allNotifications, unreadCount, dismissNotif, addNotif, markAllRead, clearAll, socket }}>
       {children}
     </SocketContext.Provider>
   );

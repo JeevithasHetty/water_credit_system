@@ -113,6 +113,20 @@ export default function TransporterDashboard() {
           </button>
         </div>
 
+        {user.availability === 'busy' && (
+          <div style={{
+            padding: '14px 16px',
+            borderRadius: 8,
+            background: 'rgba(255,193,7,.08)',
+            border: '1px solid rgba(255,193,7,.3)',
+            marginBottom: 20,
+            fontSize: 13,
+            color: 'var(--dim)',
+          }}>
+            🚛 You are currently on a delivery. Complete it before accepting new orders.
+          </div>
+        )}
+
         {/* Stats */}
         <div className="grid-3" style={{ marginBottom:28 }}>
           <div className="stat-card"><div className="stat-val" style={{ color:'var(--accent)' }}>{orders.length}</div><div className="stat-label">Total Assigned</div></div>
@@ -151,6 +165,18 @@ export default function TransporterDashboard() {
                 <div style={{ fontSize:13, display:'flex', flexDirection:'column', gap:6, marginBottom:14 }}>
                   <div>👤 <strong>{o.buyer?.name}</strong> — {o.buyer?.email}</div>
                   <div>📍 {o.deliveryAddress}</div>
+                  {o.notes && (
+                    <div style={{
+                      padding: '10px 12px',
+                      borderRadius: 6,
+                      background: 'rgba(255,193,7,.08)',
+                      border: '2px solid var(--yellow)',
+                      fontSize: 12,
+                    }}>
+                      <div style={{ color: 'var(--yellow)', fontWeight: 600, marginBottom: 4 }}>📝 Special Instructions:</div>
+                      <div>{o.notes}</div>
+                    </div>
+                  )}
                   <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
                     {o.items.map((item, i) => (
                       <span key={i} style={{ padding:'3px 9px', borderRadius:5, fontSize:12, background:'rgba(0,180,216,.08)', border:'1px solid rgba(0,180,216,.15)' }}>

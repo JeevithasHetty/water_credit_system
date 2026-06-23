@@ -94,4 +94,63 @@ const getStats = async (req, res) => {
   }
 };
 
-module.exports = { getTransporters, getVerifications, makeDecision, getAllOrders, getStats };
+const getSellers = async (req, res) => {
+  try {
+    const sellers = await User.find({ role: 'seller' })
+      .select('name email badge verified createdAt')
+      .lean();
+    
+    const Listing = require('../models/Listing');
+    const sellersWithCounts = await Promise.all(
+      sellers.map(async (seller) => {
+        const listingCount = await Listing.countDocuments({ seller: seller._id, isActive: true });
+        const orderCount = await Listing.aggregate([
+          { $match: { seller: seller._id } },
+          { $lookup: { from: 'orders', localField: '_id', foreignField: 'items.listing', as: 'orders' } },
+          { $group: { _id: null, count: { $sum: { $size: '$orders' } } } },
+        ]);
+        return {
+          ...seller,
+          listingCount,
+          orderCount: orderCount[0]?.count || 0,
+        };
+      })
+    );
+    
+    res.json({ success: true, sellers: sellersWithCounts });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+const assignSellerBadge = async (req, res) => {
+  try {
+    const { badge } = req.body;
+    const { id } = req.params;
+    
+    if (badge && !['silver', 'gold', 'diamond'].includes(badge)) {
+      return res.status(400).json({ success: false, message: 'Invalid badge value' });
+    }
+    
+    const seller = await User.findOne({ _id: id, role: 'seller' });
+    if (!seller) {
+      return res.status(404).json({ success: false, message: 'Seller not found' });
+    }
+    
+    seller.badge = badge || null;
+    await seller.save();
+    
+    req.io.to(`user:${id}`).emit('badge_assigned', {
+      badge: badge || null,
+      message: badge 
+        ? `🎉 You've been awarded the ${badge.charAt(0).toUpperCase() + badge.slice(1)} badge!`
+        : 'Your badge has been removed.',
+    });
+    
+    res.json({ success: true, message: `Badge ${badge ? 'assigned' : 'removed'}`, seller });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+module.exports = { getTransporters, getVerifications, makeDecision, getAllOrders, getStats, getSellers, assignSellerBadge };

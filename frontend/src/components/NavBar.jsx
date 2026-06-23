@@ -2,12 +2,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth }   from '../context/AuthContext';
 import { useCart }   from '../context/CartContext';
 import { useSocket } from '../context/SocketContext';
+import NotificationCenter from './NotificationCenter';
 
 const roleLinks = {
   buyer:       [{ to:'/marketplace', label:'Marketplace' }, { to:'/buyer/orders', label:'My Orders' }],
   seller:      [{ to:'/marketplace', label:'Marketplace' }, { to:'/seller/listings', label:'Listings' }, { to:'/seller/orders', label:'Orders' }],
   transporter: [{ to:'/transporter', label:'Dashboard' }],
-  admin:       [{ to:'/admin', label:'Dashboard' }, { to:'/admin/verifications', label:'Verifications' }, { to:'/admin/orders', label:'Orders' }],
+  admin:       [{ to:'/admin', label:'Dashboard' }, { to:'/admin/verifications', label:'Verifications' }, { to:'/admin/orders', label:'Orders' }, { to:'/admin/sellers', label:'Sellers' }],
 };
 
 export default function Navbar() {
@@ -74,6 +75,7 @@ export default function Navbar() {
 
           {user ? (
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <NotificationCenter />
               <div style={{ fontSize:12, color:'var(--dim)', textAlign:'right' }}>
                 <div style={{ color:'var(--white)', fontWeight:600, fontSize:13 }}>{user.name}</div>
                 <div style={{ textTransform:'capitalize', color:'var(--accent)', fontSize:11 }}>{user.role}</div>

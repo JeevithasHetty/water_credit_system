@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
   },
   rejectionReason:   { type: String, default: null },
   isSocketConnected: { type: Boolean, default: false },
+  badge:             { type: String, enum: [null, 'silver', 'gold', 'diamond'], default: null },
 }, { timestamps: true });
 
 userSchema.pre('save', async function(next) {

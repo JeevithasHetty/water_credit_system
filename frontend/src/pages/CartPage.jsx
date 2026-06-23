@@ -77,8 +77,15 @@ export default function CartPage() {
             <textarea className="form-control" rows={3} placeholder="Enter your full address…" value={address} onChange={e => setAddress(e.target.value)} />
           </div>
           <div className="form-group">
-            <label>Notes (optional)</label>
-            <input className="form-control" placeholder="Special instructions…" value={notes} onChange={e => setNotes(e.target.value)} />
+            <label>Notes (optional) <span style={{ fontSize: 11, color: 'var(--dim)' }}>— {notes.length}/200 characters</span></label>
+            <textarea
+              className="form-control"
+              placeholder="e.g. Call before arriving, Gate code: 1234, Leave at door"
+              value={notes}
+              onChange={e => setNotes(e.target.value.slice(0, 200))}
+              rows={2}
+              maxLength={200}
+            />
           </div>
           <div style={{ padding:'13px 16px', borderRadius:8, background:'rgba(0,180,216,.05)', border:'1px solid var(--border)', marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--dim)', marginBottom:7 }}>

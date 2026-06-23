@@ -18,6 +18,7 @@ import TransporterDashboard from './pages/TransporterDashboard';
 import AdminDashboard       from './pages/AdminDashboard';
 import AdminVerifications   from './pages/AdminVerifications';
 import AdminOrders          from './pages/AdminOrders';
+import AdminSellers         from './pages/AdminSellers';
 
 // Route guard — checks auth and optional role
 const Guard = ({ children, roles }) => {
@@ -62,6 +63,7 @@ function Inner() {
           <Route path="/admin"                element={<Guard roles={['admin']}><AdminDashboard /></Guard>} />
           <Route path="/admin/verifications"  element={<Guard roles={['admin']}><AdminVerifications /></Guard>} />
           <Route path="/admin/orders"         element={<Guard roles={['admin']}><AdminOrders /></Guard>} />
+          <Route path="/admin/sellers"        element={<Guard roles={['admin']}><AdminSellers /></Guard>} />
 
           {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" />} />

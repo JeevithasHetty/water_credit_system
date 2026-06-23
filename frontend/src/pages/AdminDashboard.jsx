@@ -63,6 +63,7 @@ export default function AdminDashboard() {
               )}
             </Link>
             <Link to="/admin/orders" className="btn btn-ghost btn-lg">📦 All Orders</Link>
+            <Link to="/admin/sellers" className="btn btn-ghost btn-lg">🏅 Manage Seller Badges</Link>
           </div>
         </div>
       </div>

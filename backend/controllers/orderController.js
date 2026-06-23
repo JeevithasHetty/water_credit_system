@@ -45,6 +45,29 @@ const checkout = async (req, res) => {
       notes: notes || '',
     });
 
+    // Deduct stock from listings and check for low stock
+    for (const item of orderItems) {
+      const listing = await Listing.findByIdAndUpdate(
+        item.listing,
+        { $inc: { quantityLitres: -item.quantity } },
+        { new: true }
+      );
+      
+      // Mark as inactive if stock depleted
+      if (listing.quantityLitres <= 0) {
+        await Listing.findByIdAndUpdate(item.listing, { isActive: false });
+      }
+      
+      // Emit low stock warning if below 500L
+      if (listing.quantityLitres - item.quantity > 500 && listing.quantityLitres <= 500) {
+        req.io.to(`user:${listing.seller}`).emit('low_stock', {
+          listingId: listing._id,
+          title: listing.title,
+          remaining: Math.max(0, listing.quantityLitres),
+        });
+      }
+    }
+
     if (transporter) {
       await User.findByIdAndUpdate(transporter._id, { availability: 'busy' });
     }
@@ -123,4 +146,118 @@ const getSellerOrders = async (req, res) => {
   }
 };
 
-module.exports = { checkout, getBuyerOrders, getSellerOrders };
+// GET /api/orders/seller/analytics
+const getSellerAnalytics = async (req, res) => {
+  try {
+    const sellerId = req.user._id;
+    const myListings = await Listing.find({ seller: sellerId }).select('_id waterType');
+    const listingIds = myListings.map(l => l._id);
+
+    if (listingIds.length === 0) {
+      return res.json({
+        success: true,
+        totalRevenue: 0,
+        totalLitresSold: 0,
+        totalOrders: 0,
+        ordersByWaterType: { drinking: 0, agricultural: 0, industrial: 0, rainwater: 0 },
+        revenueByMonth: [],
+        topListing: null,
+        thisWeekOrders: 0,
+        lastWeekOrders: 0,
+      });
+    }
+
+    const allOrders = await Order.find({ 'items.listing': { $in: listingIds } })
+      .populate({ path: 'items.listing', select: 'waterType title' });
+
+    // Filter orders that are Delivered (completed sales)
+    const completedOrders = allOrders.filter(o => o.deliveryStatus === 'Delivered');
+
+    // Calculate totals
+    let totalRevenue = 0;
+    let totalLitres = 0;
+    const waterTypeCounts = { drinking: 0, agricultural: 0, industrial: 0, rainwater: 0 };
+    const monthlyRevenue = {};
+    const listingOrders = {};
+
+    const today = new Date();
+    const thisWeekStart = new Date(today);
+    thisWeekStart.setDate(today.getDate() - today.getDay());
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
+    const lastWeekEnd = new Date(thisWeekStart);
+
+    let thisWeekOrders = 0;
+    let lastWeekOrders = 0;
+
+    completedOrders.forEach(order => {
+      const orderDate = new Date(order.createdAt);
+      const month = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
+
+      order.items.forEach(item => {
+        const listing = item.listing;
+        const isMine = listingIds.some(id => id.equals(listing._id));
+        if (!isMine) return;
+
+        const revenue = item.quantity * item.pricePerLitre;
+        totalRevenue += revenue;
+        totalLitres += item.quantity;
+
+        // Water type count
+        const wt = listing.waterType || 'drinking';
+        if (waterTypeCounts.hasOwnProperty(wt)) waterTypeCounts[wt]++;
+
+        // Monthly revenue
+        monthlyRevenue[month] = (monthlyRevenue[month] || 0) + revenue;
+
+        // Listing order count
+        listingOrders[listing._id] = (listingOrders[listing._id] || 0) + 1;
+      });
+
+      // Week count
+      if (orderDate >= thisWeekStart) thisWeekOrders++;
+      else if (orderDate >= lastWeekStart && orderDate < lastWeekEnd) lastWeekOrders++;
+    });
+
+    // Top listing
+    let topListing = null;
+    let maxOrders = 0;
+    for (const [listingId, count] of Object.entries(listingOrders)) {
+      if (count > maxOrders) {
+        maxOrders = count;
+        const listing = myListings.find(l => l._id.equals(listingId));
+        const fullListing = await Listing.findById(listingId).select('title waterType');
+        topListing = { id: listingId, title: fullListing?.title, orders: count };
+      }
+    }
+
+    // Revenue by month (last 6 months)
+    const revenueByMonth = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const monthName = d.toLocaleString('default', { month: 'short' });
+      revenueByMonth.push({
+        month: monthName,
+        revenue: monthlyRevenue[monthKey] || 0,
+      });
+    }
+
+    res.json({
+      success: true,
+      totalRevenue,
+      totalLitresSold: totalLitres,
+      totalOrders: completedOrders.length,
+      ordersByWaterType: waterTypeCounts,
+      revenueByMonth,
+      topListing,
+      thisWeekOrders,
+      lastWeekOrders,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+};
+
+module.exports = { checkout, getBuyerOrders, getSellerOrders, getSellerAnalytics };

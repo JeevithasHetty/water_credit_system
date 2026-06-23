@@ -9,6 +9,7 @@ const OrdersAPI = axios.create({
 OrdersAPI.placeOrder = (data) => OrdersAPI.post("/", data);
 OrdersAPI.getBuyerOrders = () => OrdersAPI.get("/buyer");
 OrdersAPI.getSellerOrders = () => OrdersAPI.get("/seller");
+OrdersAPI.getSellerAnalytics = () => OrdersAPI.get("/seller/analytics");
 
 OrdersAPI.interceptors.request.use(config => {
   const user = JSON.parse(localStorage.getItem("user"));

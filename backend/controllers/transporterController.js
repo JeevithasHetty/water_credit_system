@@ -34,6 +34,47 @@ const updateAvailability = async (req, res) => {
       availability,
     });
 
+    // When going online, check for pending orders and auto-assign oldest
+    if (availability === 'online') {
+      const pendingOrder = await Order.findOne({
+        deliveryStatus: 'Pending',
+        transporter: null,
+      }).sort({ createdAt: 1 });
+      
+      if (pendingOrder) {
+        pendingOrder.transporter = req.user._id;
+        pendingOrder.deliveryStatus = 'Assigned';
+        await pendingOrder.save();
+        
+        const populatedOrder = (id) =>
+          Order.findById(id)
+            .populate('buyer', 'name email')
+            .populate('transporter', 'name email availability liveLocation')
+            .populate({ path: 'items.listing', populate: { path: 'seller', select: 'name email location' } });
+        
+        const pop = await populatedOrder(pendingOrder._id);
+        
+        req.io.to(`user:${req.user._id}`).emit('new_order_assigned', {
+          order: pop,
+          message: `New delivery job! Order from ${pendingOrder.buyer}.`,
+        });
+        
+        req.io.to(`user:${pendingOrder.buyer}`).emit('order_status_updated', {
+          orderId: pendingOrder._id,
+          deliveryStatus: 'Assigned',
+          transporter: pop.transporter,
+          message: `Transporter ${user.name} has been assigned to your order.`,
+        });
+        
+        req.io.to('admins').emit('admin_order_updated', {
+          orderId: pendingOrder._id,
+          deliveryStatus: 'Assigned',
+          transporter: user.name,
+          buyer: pendingOrder.buyer,
+        });
+      }
+    }
+
     res.json({ success: true, message: `Now ${availability}`, user });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
@@ -78,6 +119,39 @@ const updateOrderStatus = async (req, res) => {
         name:          req.user.name,
         availability:  'online',
       });
+      
+      // Check for pending unassigned orders and auto-assign oldest one
+      const pendingOrder = await Order.findOne({
+        deliveryStatus: 'Pending',
+        transporter: null,
+      }).sort({ createdAt: 1 });
+      
+      if (pendingOrder) {
+        pendingOrder.transporter = req.user._id;
+        pendingOrder.deliveryStatus = 'Assigned';
+        await pendingOrder.save();
+        
+        const pop = await populatedOrder(pendingOrder._id);
+        
+        io.to(`user:${req.user._id}`).emit('new_order_assigned', {
+          order: pop,
+          message: `New delivery job! Order from ${pendingOrder.buyer}.`,
+        });
+        
+        io.to(`user:${pendingOrder.buyer}`).emit('order_status_updated', {
+          orderId: pendingOrder._id,
+          deliveryStatus: 'Assigned',
+          transporter: pop.transporter,
+          message: `Transporter ${req.user.name} has been assigned to your order.`,
+        });
+        
+        io.to('admins').emit('admin_order_updated', {
+          orderId: pendingOrder._id,
+          deliveryStatus: 'Assigned',
+          transporter: req.user.name,
+          buyer: pendingOrder.buyer,
+        });
+      }
     }
 
     const pop = await populatedOrder(order._id);

@@ -19,6 +19,7 @@ export const listingsAPI = {
   getMy:  () => api.get('/listings/my'),
   create: d  => api.post('/listings', d),
   delete: id => api.delete(`/listings/${id}`),
+  restock: (id, addQuantity) => api.put(`/listings/${id}/restock`, { addQuantity }),
 };
 
 export const ordersAPI = {
@@ -40,6 +41,13 @@ export const adminAPI = {
   makeDecision: (id, d) => api.post(`/admin/transporters/${id}/decision`, d),
   getAllOrders:      () => api.get('/admin/orders'),
   getStats:         () => api.get('/admin/stats'),
+  getSellers:       () => api.get('/admin/sellers'),
+  assignBadge:      (id, badge) => api.put(`/admin/sellers/${id}/badge`, { badge }),
+};
+
+export const ratingsAPI = {
+  submit: d => api.post('/ratings', d),
+  getSellerRatings: (id) => api.get(`/ratings/seller/${id}`),
 };
 
 export default api;

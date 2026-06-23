@@ -48,12 +48,13 @@ export default function AdminOrders() {
           {[
             ['Total',    orders.length,                                              'var(--white)'],
             ['Pending',  orders.filter(o => o.deliveryStatus === 'Pending').length,  'var(--yellow)'],
+            ['Pending (No Transporter)', orders.filter(o => o.deliveryStatus === 'Pending' && !o.transporter).length, 'var(--red)'],
             ['In Transit',orders.filter(o => o.deliveryStatus === 'InTransit').length,'var(--orange)'],
             ['Delivered',orders.filter(o => o.deliveryStatus === 'Delivered').length, 'var(--green)'],
           ].map(([l, v, c]) => (
             <div key={l} className="stat-card" style={{ textAlign:'center' }}>
               <div className="stat-val" style={{ color:c }}>{v}</div>
-              <div className="stat-label">{l}</div>
+              <div className="stat-label" style={{ fontSize: l === 'Pending (No Transporter)' ? 11 : 13 }}>{l}</div>
             </div>
           ))}
         </div>
@@ -77,11 +78,11 @@ export default function AdminOrders() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Order ID</th><th>Buyer</th><th>Items</th><th>Amount</th><th>Transporter</th><th>Status</th><th>Address</th><th>Date</th></tr>
+                <tr><th>Order ID</th><th>Buyer</th><th>Items</th><th>Amount</th><th>Transporter</th><th>Status</th><th>Notes</th><th>Address</th><th>Date</th></tr>
               </thead>
               <tbody>
                 {filtered.map(o => (
-                  <tr key={o._id}>
+                  <tr key={o._id} style={{ background: o.deliveryStatus === 'Pending' && !o.transporter ? 'rgba(255,193,7,.1)' : 'transparent' }}>
                     <td style={{ fontFamily:'monospace', fontSize:11, color:'var(--accent)' }}>#{o._id.slice(-8).toUpperCase()}</td>
                     <td>
                       <div style={{ fontWeight:600 }}>{o.buyer?.name}</div>
@@ -97,10 +98,13 @@ export default function AdminOrders() {
                             <div style={{ fontWeight:600 }}>{o.transporter.name}</div>
                             <span className={`badge b-${o.transporter.availability}`} style={{ fontSize:10 }}>{o.transporter.availability}</span>
                           </div>
-                        : <span style={{ color:'var(--yellow)', fontSize:12 }}>⏳ Unassigned</span>
+                        : <span style={{ color:'var(--yellow)', fontSize:12, fontWeight:600 }}>⏳ Unassigned</span>
                       }
                     </td>
                     <td><span className={`badge ${badgeClass(o.deliveryStatus)}`}>{o.deliveryStatus}</span></td>
+                    <td style={{ fontSize:11, color:'var(--dim)', maxWidth:100, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', cursor: o.notes ? 'help' : 'default' }} title={o.notes || ''}>
+                      {o.notes ? `📝 ${o.notes.slice(0, 20)}${o.notes.length > 20 ? '...' : ''}` : '—'}
+                    </td>
                     <td style={{ fontSize:11, color:'var(--dim)', maxWidth:140 }}>{o.deliveryAddress}</td>
                     <td style={{ fontSize:11, color:'var(--dim)', whiteSpace:'nowrap' }}>
                       {new Date(o.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}

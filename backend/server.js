@@ -98,6 +98,7 @@ app.use('/api/listings',    require('./routes/listingRoutes'));
 app.use('/api/orders',      require('./routes/orderRoutes'));
 app.use('/api/transporter', require('./routes/transporterRoutes'));
 app.use('/api/admin',       require('./routes/adminRoutes'));
+app.use('/api/ratings',     require('./routes/ratingRoutes'));
 
 app.get('/api/health', (req, res) =>
   res.json({ status: 'OK', websocket: 'enabled', time: new Date() })
